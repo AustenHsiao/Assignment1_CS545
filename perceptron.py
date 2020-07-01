@@ -67,12 +67,16 @@ class Network:
         trainingSet = trainingSet.to_numpy()
         np.random.shuffle(trainingSet)
 
+        # Running the initial accuracy test (No perceptron training)
+        # Accuracy data is saved to accuracy.csv
         start = time.time()
         accuracy = [0, self.compute_accuracy(trainingSet)]
         pd.DataFrame(accuracy).to_csv("accuracy.csv", mode='a', header=False, index=False)
         print("Initial accuracy:", accuracy[1])
         print("Time:", time.time() - start)
         
+        # Running the perceptron training algorithm and remaining accuracy tests
+        # Accuracy data saved to accuracy.csv
         for i in range(numberofEpochs):
             np.random.shuffle(trainingSet) 
             start = time.time()
