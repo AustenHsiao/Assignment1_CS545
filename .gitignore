@@ -2,3 +2,4 @@ accuracy.csv
 mnist_validation.csv
 scaledTS.csv
 mnist_train.csv
+perceptron.py

@@ -12,18 +12,15 @@ FILE_ROW = 60000
 FILE_COLUMN = 785
 
 class Network:
-    weights = np.zeros((ROW, COLUMN))
+    # Initialize self.weights
+    weights = np.random.uniform(low=-0.05, high=0.05, size=(ROW, COLUMN))
     learningRate = 0
 
-    # Constructor, takes in an int for the learningRate. 
-    # Creates a ROWxCOLUMN matrix populated with random weights in the interval [-0.05 and 0.05)
+    # Constructor, takes in a rate for the learningRate. 
     def __init__(self, lrate):
         self.learningRate = lrate
-        for i in range(ROW):
-            for j in range(COLUMN):
-                self.weights[i][j] = random.uniform(-0.05, 0.05)
 
-    # Prints out the weight matrix-- mainly used to make sure the constructor set things up right
+    # Prints out the weight matrix-- mainly used for debugging to make sure the weight matrix was set up correctly
     def printWeights(self):
         for i in self.weights:
             print(i)
@@ -46,7 +43,7 @@ class Network:
             return -1
         # This 1, inserted at the end of the pre-existing columns is for the bias
         trainingSet.insert(785, 785, 1)
-        print("Setting up scaled and randomly ordered training set. This involves converting Ints to Floats and may take a while. Please wait...")
+        print("Setting up scaled and randomly ordered training set file. This involves converting Ints to Floats and may take a while. Please wait...")
         ((trainingSet.loc[0:20000, 0:0].join(trainingSet.loc[0:20000, 1:784].apply(lambda x: x/255))).join(trainingSet.loc[0:20000, 785:785])).to_csv("scaledTS.csv", mode="a", header=False, index=False)
         ((trainingSet.loc[20001:40000, 0:0].join(trainingSet.loc[20001:40000, 1:784].apply(lambda x: x/255))).join(trainingSet.loc[20001:40000, 785:785])).to_csv("scaledTS.csv", mode="a", header=False, index=False)
         ((trainingSet.loc[40001:59999, 0:0].join(trainingSet.loc[40001:59999, 1:784].apply(lambda x: x/255))).join(trainingSet.loc[40001:59999, 785:785])).to_csv("scaledTS.csv", mode="a", header=False, index=False)    
@@ -55,7 +52,7 @@ class Network:
 
     # Takes one int as input-- the number of epochs to run. This function will open "scaledTS.csv" and run
     # epocs, training the perceptrons along the way. Data for accuracy is recorded and appended to a file, "accuracy.csv".
-    # Returns 1 if it runs to completion. It also prints out run times in seconds for each epoch. 
+    # Returns 1 if it runs to completion. It also prints out accuracies and run times (seconds) for each epoch. 
     def run_epoch(self, numberofEpochs):
         if not os.path.isfile("scaledTS.csv"):
                 print("Run open_mnist_train_and_initialize_trainingSet() before running this function! scaledTS.csv not found")
@@ -70,9 +67,11 @@ class Network:
         # Running the initial accuracy test (No perceptron training)
         # Accuracy data is saved to accuracy.csv
         start = time.time()
-        accuracy = [0, self.compute_accuracy(trainingSet)]
-        pd.DataFrame(accuracy).to_csv("accuracy.csv", mode='a', header=False, index=False)
-        print("Initial accuracy:", accuracy[1])
+        training_accuracy = self.compute_accuracy(trainingSet)
+        validation_accuracy = self.check_validation_set()
+        pd.DataFrame([0], [training_accuracy], [validation_accuracy]).to_csv("accuracy.csv", mode='a', header=False, index=False)
+        print("Initial training accuracy:", training_accuracy)
+        print("Initial validation accuracy:", validation_accuracy)
         print("Time:", time.time() - start)
         
         # Running the perceptron training algorithm and remaining accuracy tests
@@ -82,13 +81,23 @@ class Network:
             start = time.time()
             for single_trial in trainingSet:
                 for perceptronNumber in range(10):
+                    # To save time, since we're working with each line of training data, the calculated Output and expected Output
+                    # will be consistent for all inputs in the row. We can compute (eta*(expectedOutput - calculatedOutput)) and multiply with each
+                    # input to determine delW
                     calculatedOutput = self.calculated_output(single_trial, perceptronNumber)
                     expectedOutput = self.expected_output(single_trial, perceptronNumber)
-                    self.run_one_trial(single_trial, perceptronNumber, calculatedOutput, expectedOutput)
+                    # Another time saving measure-- if we're going to get 0, we can skip updating entirely
+                    if calculatedOutput == expectedOutput:
+                        continue
+                    preW = self.learningRate * (expectedOutput - calculatedOutput)
+                    self.run_one_trial(single_trial, perceptronNumber)#, preW)
             
-            accuracy = [i+1, self.compute_accuracy(trainingSet)]
-            pd.DataFrame(accuracy).to_csv("accuracy.csv", mode='a', header=False, index=False)
-            print("Accuracy for epoch", i+1, ": ", accuracy[1])
+            # Reporting accuracy and time
+            training_accuracy = self.compute_accuracy(trainingSet)
+            validation_accuracy = self.check_validation_set()
+            pd.DataFrame([i+1], [training_accuracy], [validation_accuracy]).to_csv("accuracy.csv", mode='a', header=False, index=False)
+            print("Training accuracy for epoch", i+1, ": ", training_accuracy)
+            print("Validation accuracy for epoch", i+1, ": ", validation_accuracy)
             print("Time:", time.time() - start)
         return 1
         
@@ -132,20 +141,17 @@ class Network:
     # Inputs: one line of data ([A, x, x, x, x..., 1]), perceptron number, the calculated output for the data, and the 
     # expected output for the data. This function will update the weight matrix by calculating deltaW, as explained by the 
     # perceptron training algorithm. return type void
-    def run_one_trial(self, trainingData, perceptronNumber, calculatedOutput, expectedOutput):
-        if calculatedOutput == expectedOutput:
-            return
+    def run_one_trial(self, trainingData, perceptronNumber):#, preW):
         for training_index in range(len(trainingData[1:])):
             if trainingData[training_index] == 0:
                 continue
-            delW = self.learningRate * (expectedOutput - calculatedOutput) * trainingData[training_index]
+            delW = preW * trainingData[training_index]
             self.weights[perceptronNumber][training_index] += delW
         return 
     
-    # Takes 2 arguments, but should really only be run with 1 argument. Specify 1 if the perceptrons have already been trained,
-    # otherwise, any other number works. This function opens up "mnist_validation.csv" and runs the accuracy function upon it.
-    # Again, all of the data in the validation csv are formatted identically to the training set csv. Returns 1 if ran to completion 
-    def check_validation_set(self, after=1, name="mnist_validation.csv"):
+    # This function opens up "mnist_validation.csv" and runs the accuracy function upon it.
+    # Again, all of the data in the validation csv are formatted identically to the training set csv. Returns accuracy if ran to completion 
+    def check_validation_set(self, name="mnist_validation.csv"):
         try: 
             validationSet = pd.read_csv(name, header=None)
         except:
@@ -154,14 +160,39 @@ class Network:
         validationSet.insert(785, 785, 1)
         validationSet = validationSet.to_numpy()
         accuracy = self.compute_accuracy(validationSet)
-        if after == 1:
-            print("Validation set accuracy after training:", accuracy)
-            return 1
-        print("Validation set accuracy before training:", accuracy)
-        return 1
+        return accuracy
+
+    def return_predicted_class_for_trial(self, single_trial):
+        maximum, maxPerceptron = -99999, -1
+        for perceptron in range(10):
+            current = np.dot(single_trial[1:], self.weights[perceptron])
+            if current > maximum:
+                maximum = current
+                maxPerceptron = perceptron
+        return maxPerceptron
+
+    # Called after the training has completed, this function generates a confusion matrix for the validation set:
+    # returns counts of actual classifier x predicted classifier (10x10 matrix)
+    def confusion_matrix(self, name="mnist_validation.csv"):
+        try: 
+            validationSet = pd.read_csv(name, header=None)
+        except:
+            print("mnist_validation.csv not found")
+            return -1
         
+        validationSet.insert(785, 785, 1)
+        validationSet = validationSet.to_numpy()
+        confusionMatrix = np.zeros((10,10), dtype=float)
+        if os.path.isfile("confusion_matrix.csv"):
+            os.remove("confusion_matrix.csv")
+        for trial in validationSet:
+            confusionMatrix[self.return_predicted_class_for_trial(trial)][trial[0]] += 1
+        
+        pd.DataFrame(data=confusionMatrix).to_csv("confusion_matrix.csv", mode='a', header=False, index=False)
+        return
+
 if __name__ == '__main__':
-    assignment1 = Network(0.1)
-    assignment1.check_validation_set(0)
-    assignment1.run_epoch(3)
-    assignment1.check_validation_set(1)
+    assignment1 = Network(0.00001)
+    #assignment1.open_mnist_train_and_initialize_trainingSet()
+    assignment1.run_epoch(1)
+    #assignment1.confusion_matrix()
