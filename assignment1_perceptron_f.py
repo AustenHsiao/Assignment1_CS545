@@ -25,11 +25,12 @@ class Network:
 		if os.path.isfile("scaledTS.csv"):
 			os.remove("scaledTS.csv")
 		print("Creating scaledTS.csv. May take about a minute")
-		trainingSet.insert(785,785,1)
-		first = trainingSet.loc[0:60000, 0:0]
-		middle = trainingSet.loc[0:60000, 1:784].apply(lambda x: x/255)
-		end = trainingSet.loc[0:60000, 785:785]
-		(first.join(middle)).join(end).to_csv("scaledTS.csv", mode="a", header=False, index=False)
+		trainingSet.insert(785,785,1) # insert a column of 1s at column 785 for all rows
+		first = trainingSet.loc[0:60000, 0:0] # first part is column 0 of all rows
+		middle = trainingSet.loc[0:60000, 1:784].apply(lambda x: x/255) # middle part is columns 1:784 for all columns
+		end = trainingSet.loc[0:60000, 785:785] # end part is the column of ones
+		# I split up the document like this so I can apply /255 to the center columns
+		(first.join(middle)).join(end).to_csv("scaledTS.csv", mode="a", header=False, index=False) # Here is where I join all the pieces together and write it to scaledTS.csv
 		print("Done")
 		return	
 
@@ -39,6 +40,8 @@ class Network:
 		trainingAcc = [0]*10
 		validationAcc = [0]*10	
 	
+		# creates an array of outputs for each perceptron, then reports the index of the highest value
+		# if this value is the same as the expected perceptron, increase acc
 		acc = 0
 		for line_of_data in trainingSet:
 			for perceptron in range(10):
@@ -87,18 +90,24 @@ class Network:
 			if y == expected:
 				return
 
+	# run numEpoch number of epochs
 	def runEpoch(self, numEpoch):
 		if os.path.isfile("accuracy.csv"):
 			os.remove("accuracy.csv")
 		trainingSet = pd.read_csv("scaledTS.csv", header=None).to_numpy()
 		validationSet = pd.read_csv("mnist_validation.csv", header=None)
+		# need to append the column of 1s to the validation set
 		validationSet.insert(785,785,1)
 		validationSet = validationSet.to_numpy()
 
 		start = time.time()
+		# report the accuracy for the 0th epoch (calling this function writes to a csv)
 		self.reportAccuracy(0, trainingSet, validationSet)	
 		print("Time:", time.time()-start)
 
+		# for all the epochs specified, we shuffle the trainingSet
+		# Then we iterate through each training set example, applying it to each of the perceptrons.
+		# Once all examples are run, we report the accuracy, writing it to a file.
 		for epoch in range(numEpoch):
 			np.random.shuffle(trainingSet)
 			start = time.time()
@@ -113,7 +122,8 @@ class Network:
 			print("Time:", time.time()-start)
 
 		return
-			
+
+	# returns the class when run through the network		
 	def returnCalculatedClassForTrial(self, single_trial):
 		output = [0]*10
 		for perceptron in range(10):
