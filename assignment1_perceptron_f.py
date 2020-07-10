@@ -1,4 +1,5 @@
 # Written by Austen Hsiao for Assignment 1, cs545 (MachineLearning)
+# PSU ID: 985647212
 # This program has no error checking and I did not write unit tests.
 # It's hardcoded for the files for assignment 1
 
@@ -12,7 +13,7 @@ class Network:
 	# Upon object instantiation, the weights matrix is created. 
 	# Each individual array in the matrix are perceptron weights
 	weights = np.random.uniform(low=-0.05, high=0.05, size=(10,785))
-	learingRate = 0
+	learningRate = 0
 	
 	# Constructor allows us to set the learning rate
 	def __init__(self, rate):
