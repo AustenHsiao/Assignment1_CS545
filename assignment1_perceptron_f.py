@@ -65,12 +65,14 @@ class Network:
 		print("Validation accuracy for epoch", currentEpoch, ":", validationAccuracy)
 		pd.DataFrame({'epoch':[currentEpoch],'training':[trainingAccuracy],'validation':[validationAccuracy]}, columns=['epoch','training','validation']).to_csv("accuracy.csv", mode='a', header=False, index=False)
 		return
-
+	
+	# calculatedOutput returns the results for given perceptron. These are not using the Sigmoid function, so the result is either 0 or 1.
 	def calculatedOutput(self, data, perceptronNumber):
 		if np.dot(data[1:], self.weights[perceptronNumber]) > 0:
 			return 1
 		return 0
 	
+	# expectedOutput returns the expected result for a given perceptron, used during training.
 	def expectedOutput(self, data, perceptronNumber):
 		if data[0] == perceptronNumber:
 			return 1
@@ -132,7 +134,7 @@ class Network:
 		
 		return output.index(max(output))
 		
-	# creates a confusion matrix (rows: actual, columns predicted)
+	# creates a confusion matrix (rows: actual, columns: predicted)
 	def confusionMatrix(self):
 		validationSet = pd.read_csv("mnist_validation.csv", header=None)
 
